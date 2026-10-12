@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Опросник: погоны</title>
+<style>
+  *{box-sizing:border-box}
+  body{
+    margin:0;min-height:100vh;
+    background:radial-gradient(circle at 50% 0%, #1e2836, #0b0f14 65%);
+    color:#e6edf3;
+    font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+    display:flex;justify-content:center;
+    padding:20px 14px 60px;
+  }
+  .app{width:100%;max-width:480px}
+  header{text-align:center;margin-bottom:16px}
+  h1{margin:0;font-size:26px;letter-spacing:.5px;
+     background:linear-gradient(90deg,#d8a72a,#f0d47a,#d8a72a);
+     -webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{margin:4px 0 0;font-size:13px;color:#8b98a8}
+
+  .modes{display:flex;gap:8px;justify-content:center;margin:14px 0}
+  .modes button{
+    flex:1;padding:9px 6px;border-radius:10px;cursor:pointer;
+    background:#161d27;border:1px solid #2a3543;color:#a9b6c6;
+    font-size:13px;font-weight:600;transition:.15s;
+  }
+  .modes button:hover{background:#1d2634;color:#dbe4ee}
+  .modes button.active{background:#d8a72a;border-color:#d8a72a;color:#181206}
+
+  .stats{display:flex;justify-content:space-between;font-size:12px;
+    color:#8b98a8;padding:0 4px 10px}
+  .stats b{color:#e6edf3}
+
+  .card{
+    background:linear-gradient(180deg,#151d28,#111720);
+    border:1px solid #232e3d;border-radius:18px;
+    padding:16px 16px 18px;position:relative;
+    box-shadow:0 18px 40px -20px #000;
+  }
+  .tag{
+    position:absolute;top:14px;left:16px;
+    font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+    padding:4px 10px;border-radius:20px;
+  }
+  .tag.army{background:#2f4426;color:#a7d18b;border:1px solid #3f5c32}
+  .tag.navy{background:#1b2a5e;color:#9db4f0;border:1px solid #2c3f80}
+
+  .pogon-wrap{display:flex;justify-content:center;padding:26px 0 10px}
+  .pogon-wrap svg{height:280px;width:auto;
+    filter:drop-shadow(0 12px 18px rgba(0,0,0,.55));}
+
+  .answer-area{display:flex;gap:8px;margin-top:6px}
+  #inp{
+    flex:1;padding:13px 14px;border-radius:11px;
+    background:#0c1119;border:1.5px solid #2a3543;color:#e6edf3;
+    font-size:15px;outline:none;transition:.15s;font-family:inherit;
+  }
+  #inp:focus{border-color:#d8a72a;box-shadow:0 0 0 3px rgba(216,167,42,.14)}
+  #inp:disabled{opacity:.6}
+  #btn{
+    padding:13px 18px;border-radius:11px;border:none;cursor:pointer;
+    background:linear-gradient(180deg,#e8bb3e,#c9961d);color:#1a1305;
+    font-weight:700;font-size:14px;white-space:nowrap;transition:.15s;
+    font-family:inherit;
+  }
+  #btn:hover{filter:brightness(1.08)}
+  #btn:active{transform:translateY(1px)}
+
+  .feedback{min-height:44px;margin-top:12px;font-size:14px;line-height:1.45;
+    text-align:center;padding:0 4px}
+  .feedback.ok{color:#7ddc8a}
+  .feedback.bad{color:#ff8b8b}
+  .feedback .ans{display:block;margin-top:5px;color:#d8a72a;font-weight:700;font-size:16px}
+  .feedback .hint{display:block;margin-top:4px;color:#8b98a8;font-size:12.5px}
+
+  .ghost{
+    display:block;width:100%;margin-top:12px;padding:11px;
+    background:transparent;border:1px dashed #33414f;color:#8b98a8;
+    border-radius:11px;cursor:pointer;font-size:13px;font-family:inherit;
+    transition:.15s;
+  }
+  .ghost:hover{border-color:#4c5f73;color:#c2ceda}
+  .ghost:disabled{opacity:.35;cursor:default}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>ПОГОНЫ</h1>
+    <p class="sub">Назовите воинское звание по погону</p>
+  </header>
+
+  <div class="modes">
+    <button data-mode="all" class="active">Всё</button>
+    <button data-mode="army">Армия</button>
+    <button data-mode="navy">Флот</button>
+  </div>
+
+  <div class="stats">
+    <span>Верно: <b id="sc">0</b></span>
+    <span>Вопросов: <b id="tt">0</b></span>
+    <span>Точность: <b id="acc">—</b></span>
+  </div>
+
+  <div class="card">
+    <div class="tag army" id="tag">Армия</div>
+    <div class="pogon-wrap" id="pogon"></div>
+
+    <div class="answer-area">
+      <input id="inp" type="text" placeholder="Введите звание…"
+             autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button id="btn">Проверить</button>
+    </div>
+
+    <div class="feedback" id="fb"></div>
+  </div>
+
+  <button class="ghost" id="skip">Не знаю — показать ответ</button>
+</div>
+
+<script>
+/* ============ ДАННЫЕ ============ */
+
+// Лычки: y — положение по вертикали, h — толщина
+// Звёзды: x, y — центр, r — радиус
+const RANKS = [
+  /* ---------- АРМИЯ (сухопутные войска) ---------- */
+  { b:'army', n:'Рядовой', a:['рядовой','солдат'] },
+
+  { b:'army', n:'Ефрейтор', a:['ефрейтор'],
+    ly:[{y:95,h:12}] },
+
+  { b:'army', n:'Младший сержант', a:['младший сержант','мл сержант','младший серж'],
+    ly:[{y:78,h:12},{y:118,h:12}] },
+
+  { b:'army', n:'Сержант', a:['сержант'],
+    ly:[{y:62,h:12},{y:102,h:12},{y:142,h:12}] },
+
+  { b:'army', n:'Старший сержант', a:['старший сержант','ст сержант','старший серж'],
+    ly:[{y:100,h:26}] },
+
+  { b:'army', n:'Прапорщик', a:['прапорщик'],
+    st:[{x:60,y:105,r:11},{x:60,y:168,r:11}] },
+
+  { b:'army', n:'Старший прапорщик', a:['старший прапорщик','ст прапорщик'],
+    st:[{x:60,y:78,r:11},{x:60,y:130,r:11},{x:60,y:182,r:11}] },
+
+  { b:'army', n:'Младший лейтенант', a:['младший лейтенант','мл лейтенант'],
+    st:[{x:60,y:125,r:11}] },
+
+  { b:'army', n:'Лейтенант', a:['лейтенант'],
+    st:[{x:60,y:95,r:11},{x:60,y:165,r:11}] },
+
+  { b:'army', n:'Старший лейтенант', a:['старший лейтенант','ст лейтенант'],
+    st:[{x:60,y:88,r:11},{x:38,y:168,r:11},{x:82,y:168,r:11}] },
+
+  { b:'army', n:'Капитан', a:['капитан'],
+    st:[{x:40,y:105,r:11},{x:80,y:105,r:11},{x:40,y:172,r:11},{x:80,y:172,r:11}] },
+
+  { b:'army', n:'Майор', a:['майор'],
+    st:[{x:60,y:130,r:18}] },
+
+  { b:'army', n:'Подполковник', a:['подполковник'],
+    st:[{x:60,y:95,r:18},{x:60,y:172,r:18}] },
+
+  { b:'army', n:'Полковник', a:['полковник'],
+    st:[{x:60,y:85,r:18},{x:38,y:172,r:18},{x:82,y:172,r:18}] },
+
+  { b:'army', n:'Генерал-майор', a:['генерал майор','генерал-майор','генералмайор'],
+    st:[{x:60,y:140,r:20}] },
+
+  { b:'army', n:'Генерал-лейтенант', a:['генерал лейтенант','генерал-лейтенант'],
+    st:[{x:60,y:95,r:19},{x:60,y:180,r:19}] },
+
+  { b:'army', n:'Генерал-полковник', a:['генерал полковник','генерал-полковник'],
+    st:[{x:60,y:88,r:19},{x:39,y:178,r:19},{x:81,y:178,r:19}] },
+
+  { b:'army', n:'Генерал армии', a:['генерал армии'],
+    st:[{x:60,y:170,r:20}], em:true },
+
+  { b:'army', n:'Маршал Российской Федерации',
+    a:['маршал','маршал российской федерации','маршал рф'],
+    st:[{x:60,y:172,r:20}], em:true },
+
+  /* ---------- ФЛОТ (корабельные) ---------- */
+  { b:'navy', n:'Матрос', a:['матрос'] },
+
+  { b:'navy', n:'Старший матрос', a:['старший матрос','ст матрос'],
+    ly:[{y:95,h:12}] },
+
+  { b:'navy', n:'Старшина 2 статьи', a:['старшина 2 статьи','старшина второй статьи','старшина 2'],
+    ly:[{y:78,h:12},{y:118,h:12}] },
+
+  { b:'navy', n:'Старшина 1 статьи', a:['старшина 1 статьи','старшина первой статьи','старшина 1'],
+    ly:[{y:62,h:12},{y:102,h:12},{y:142,h:12}] },
+
+  { b:'navy', n:'Главный старшина', a:['главный старшина'],
+    ly:[{y:100,h:26}] },
+
+  { b:'navy', n:'Мичман', a:['мичман'],
+    st:[{x:60,y:105,r:11},{x:60,y:168,r:11}] },
+
+  { b:'navy', n:'Старший мичман', a:['старший мичман','ст мичман'],
+    st:[{x:60,y:78,r:11},{x:60,y:130,r:11},{x:60,y:182,r:11}] },
+
+  { b:'navy', n:'Младший лейтенант', a:['младший лейтенант','мл лейтенант'],
+    st:[{x:60,y:125,r:11}] },
+
+  { b:'navy', n:'Лейтенант', a:['лейтенант'],
+    st:[{x:60,y:95,r:11},{x:60,y:165,r:11}] },
+
+  { b:'navy', n:'Старший лейтенант', a:['старший лейтенант','ст лейтенант'],
+    st:[{x:60,y:88,r:11},{x:38,y:168,r:11},{x:82,y:168,r:11}] },
+
+  { b:'navy', n:'Капитан-лейтенант', a:['капитан лейтенант','капитан-лейтенант','капитанлейтенант'],
+    st:[{x:40,y:105,r:11},{x:80,y:105,r:11},{x:40,y:172,r:11},{x:80,y:172,r:11}] },
+
+  { b:'navy', n:'Капитан 3 ранга', a:['капитан 3 ранга','капитан третьего ранга'],
+    st:[{x:60,y:130,r:18}] },
+
+  { b:'navy', n:'Капитан 2 ранга', a:['капитан 2 ранга','капитан второго ранга'],
+    st:[{x:60,y:95,r:18},{x:60,y:172,r:18}] },
+
+  { b:'navy', n:'Капитан 1 ранга', a:['капитан 1 ранга','капитан первого ранга'],
+    st:[{x:60,y:85,r:18},{x:38,y:172,r:18},{x:82,y:172,r:18}] },
+
+  { b:'navy', n:'Контр-адмирал', a:['контр адмирал','контр-адмирал','контрадмирал'],
+    st:[{x:60,y:135,r:20}] },
+
+  { b:'navy', n:'Вице-адмирал', a:['вице адмирал','вице-адмирал','вицеадмирал'],
+    st:[{x:60,y:95,r:19},{x:60,y:180,r:19}] },
+
+  { b:'navy', n:'Адмирал', a:['адмирал'],
+    st:[{x:60,y:88,r:19},{x:39,y:178,r:19},{x:81,y:178,r:19}] },
+
+  { b:'navy', n:'Адмирал флота', a:['адмирал флота'],
+    st:[{x:60,y:170,r:20}], em:true },
+];
+
+/* ============ РИСОВАНИЕ ПОГОНА ============ */
+
+const POGON_PATH = "M28 14 L92 14 Q100 14 100 22 L110 250 L10 250 L20 22 Q20 14 28 14 Z";
+
+function makeStar(cx, cy, r){
+  let d = '';
+  for (let i = 0; i < 10; i++){
+    const ang = -Math.PI/2 + i * Math.PI/5;
+    const rad = (i % 2 === 0) ? r : r * 0.382;
+    const x = cx + rad * Math.cos(ang);
+    const y = cy + rad * Math.sin(ang);
+    d += (i === 0 ? 'M' : 'L') + x.toFixed(2) + ' ' + y.toFixed(2);
+  }
+  return d + 'Z';
+}
+
+function buildSVG(item){
+  const navy = item.b === 'navy';
+  const bg        = navy ? '#1c2a5e' : '#4e6b3c';
+  const stripeCol = '#9d2226';
+  const metal     = '#d8a72a';
+  const metalDk   = '#8a6410';
+  const edge      = '#1b2027';
+
+  let g = '';
+
+  // Продольные просветы (только у армейских)
+  if (!navy){
+    g += `<polygon points="30.4,14 43.2,14 39,250 23,250" fill="${stripeCol}"/>`;
+    g += `<polygon points="76.8,14 89.6,14 97,250 81,250" fill="${stripeCol}"/>`;
+  }
+
+  // Поперечные лычки
+  (item.ly || []).forEach(l => {
+    g += `<rect x="0" y="${l.y}" width="120" height="${l.h}" fill="${metal}"/>`;
+  });
+
+  let out = `<svg viewBox="0 0 120 264" xmlns="http://www.w3.org/2000/svg">`;
+  out += `<defs><clipPath id="pc"><path d="${POGON_PATH}"/></clipPath></defs>`;
+  out += `<path d="${POGON_PATH}" fill="${bg}" stroke="${edge}" stroke-width="2.5"/>`;
+  out += `<g clip-path="url(#pc)">${g}</g>`;
+
+  // Эмблема
+  if (item.em){
+    out += `<circle cx="60" cy="80" r="13" fill="none" stroke="${metal}" stroke-width="2.5"/>`;
+    out += `<path d="${makeStar(60, 80, 7.5)}" fill="${metal}"/>`;
+  }
+
+  // Звёзды
+  (item.st || []).forEach(s => {
+    out += `<path d="${makeStar(s.x, s.y, s.r)}" fill="${metal}"
+             stroke="${metalDk}" stroke-width="0.9"/>`;
+  });
+
+  // Пуговица
+  out += `<circle cx="60" cy="30" r="9" fill="${metal}"
+           stroke="${metalDk}" stroke-width="1.6"/>`;
+
+  out += `</svg>`;
+  return out;
+}
+
+/* ============ ЛОГИКА ОПРОСА ============ */
+
+const $ = id => document.getElementById(id);
+const elPogon = $('pogon'), elTag = $('tag'), elInp = $('inp'),
+      elBtn = $('btn'), elFb = $('fb'), elSkip = $('skip'),
+      elSc = $('sc'), elTt = $('tt'), elAcc = $('acc');
+
+let mode = 'all';
+let pool = [];
+let current = null;
+let answered = false;
+let score = 0, total = 0, lastId = null;
+
+function buildPool(){
+  pool = RANKS.filter(r => mode === 'all' || r.b === mode);
+}
+
+function norm(s){
+  return s.toLowerCase()
+          .replace(/ё/g,'е')
+          .replace(/[^а-яa-z0-9]/g,'');
+}
+
+function lev(a, b){
+  const m = a.length, n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  let prev = Array.from({length:n+1}, (_,i) => i);
+  for (let i = 1; i <= m; i++){
+    const cur = [i];
+    for (let j = 1; j <= n; j++){
+      cur[j] = Math.min(
+        prev[j] + 1,
+        cur[j-1] + 1,
+        prev[j-1] + (a[i-1] === b[j-1] ? 0 : 1)
+      );
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+
+function matches(input, item){
+  const inp = norm(input);
+  if (!inp) return false;
+  const cands = [item.n, ...(item.a || [])].map(norm);
+  return cands.some(c => {
+    if (c === inp) return true;
+    const len = c.length;
+    const maxD = len <= 6 ? 1 : len <= 12 ? 2 : 3;
+    return lev(inp, c) <= maxD;
+  });
+}
+
+function nextQuestion(){
+  if (!pool.length) buildPool();
+  let pick;
+  let guard = 0;
+  do {
+    pick = pool[Math.floor(Math.random() * pool.length)];
+    guard++;
+  } while (pool.length > 1 && pick.n === lastId && guard < 50);
+
+  current = pick;
+  lastId = pick.n;
+  answered = false;
+
+  elPogon.innerHTML = buildSVG(current);
+  elTag.textContent = current.b === 'navy' ? 'Военно-морской флот' : 'Сухопутные войска';
+  elTag.className = 'tag ' + current.b;
+
+  elInp.value = '';
+  elInp.disabled = false;
+  elInp.focus();
+  elBtn.textContent = 'Проверить';
+  elFb.className = 'feedback';
+  elFb.innerHTML = '';
+  elSkip.disabled = false;
+}
+
+function updateStats(){
+  elSc.textContent = score;
+  elTt.textContent = total;
+  elAcc.textContent = total ? Math.round(score / total * 100) + '%' : '—';
+}
+
+function reveal(correct, userAnswer){
+  answered = true;
+  elInp.disabled = true;
+  elSkip.disabled = true;
+  elBtn.textContent = 'Дальше';
+  total++;
+  if (correct) score++;
+  updateStats();
+
+  if (correct){
+    elFb.className = 'feedback ok';
+    elFb.innerHTML = '✔ Верно!<span class="ans">' + current.n + '</span>';
+  } else {
+    elFb.className = 'feedback bad';
+    elFb.innerHTML =
+      (userAnswer ? '✘ Неверно.' : '✘ Пропущено.') +
+      '<span class="ans">' + current.n + '</span>' +
+      '<span class="hint">' +
+        (current.b === 'navy' ? 'Корабельное звание' : 'Войсковое звание') +
+      '</span>';
+  }
+}
+
+function check(){
+  if (answered){ nextQuestion(); return; }
+  const val = elInp.value.trim();
+  if (!val){ elInp.focus(); return; }
+  reveal(matches(val, current), val);
+}
+
+/* ---- события ---- */
+elBtn.addEventListener('click', check);
+
+elInp.addEventListener('keydown', e => {
+  if (e.key === 'Enter'){ e.preventDefault(); check(); }
+});
+
+elSkip.addEventListener('click', () => {
+  if (answered) return;
+  reveal(false, '');
+});
+
+document.querySelectorAll('.modes button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.modes button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    mode = b.dataset.mode;
+    buildPool();
+    lastId = null;
+    nextQuestion();
+  });
+});
+
+/* ---- старт ---- */
+buildPool();
+updateStats();
+nextQuestion();
+</script>
+</body>
+</html>
